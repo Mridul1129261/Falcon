@@ -1,0 +1,325 @@
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
+#include <winsock2.h>
+#include <vector>
+
+#pragma comment(lib, "ws2_32.lib") // Link with the Winsock library
+// modification done
+
+// C++ library headers
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+
+// project headers
+#include "dhdc.h"
+#include "drdc.h"
+
+std::vector<double> receivedDataX;
+std::vector<double> receivedDataY;
+std::vector<double> receivedDataZ;
+
+std::vector<double> receivedDataPosX;
+std::vector<double> receivedDataPosY;
+std::vector<double> receivedDataPosZ;
+
+////////////////////////////////////////////////////////////////////////////////
+void recordDataToCSV(const std::string& filename, std::vector<double> &receivedDataX, std::vector<double> &receivedDataY, std::vector<double> &receivedDataZ) {
+    std::ofstream outputFile(filename);
+    if (!outputFile.is_open()) {
+        std::cerr << "Error: Unable to open file " << filename << std::endl;
+        return;
+    }
+
+    
+
+    // Write header to the CSV file
+    outputFile << "X, Y, Z\n";
+
+    // Write data to the CSV file
+    for (size_t i = 0; i < receivedDataX.size(); ++i) {
+        outputFile << receivedDataX[i] << ',' << receivedDataY[i] << ',' << receivedDataZ[i] << '\n';
+    }
+
+    std::cout << "Data recorded to " << filename << std::endl;
+}
+int main(int argc,
+    char* argv[])
+{
+
+    std::cout << "status: " << DHD_STATUS_FORCE << std::endl;
+    // dhdEnableForce(DHD_ON, deviceID1);
+    //dhdEnableSimulator(true);
+    // dhdSetGravityCompensation(DHD_ON, deviceID1);
+     //drdStart(deviceID0);
+     //drdStart(deviceID1);
+     //dhdSetForce (0.0, 1.0009, 0.0, deviceID1);
+    int deviceID0 = 0;
+    int deviceID1 = 1;
+    for (int dev = 0; dev < 1; dev++) {
+
+        // open device
+        if (drdOpenID(dev) < 0) {
+            printf("error: not enough devices found\n");
+            dhdSleep(2.0);
+            for (int j = 0; j <= dev; j++) drdClose(j);
+            return -1;
+        }
+
+
+        // initialize Falcon by hand if necessary
+        if (!drdIsInitialized() && dhdGetSystemType() == DHD_DEVICE_FALCON) {
+            printf("please initialize Falcon device...\r"); fflush(stdout);
+            while (!drdIsInitialized()) dhdSetForce(0.0, 0.0, 0.0);
+            printf("                                  \r");
+            dhdSleep(0.5);
+        }
+
+        // initialize if necessary
+        if (!drdIsInitialized(dev) && (drdAutoInit(dev) < 0)) {
+            printf("error: initialization failed (%s)\n", dhdErrorGetLastStr());
+            dhdSleep(2.0);
+            for (int j = 0; j <= dev; j++) drdClose(j);
+            return -1;
+        }
+
+        // start robot control loop
+        if (drdStart(dev) < 0) {
+            printf("error: control loop failed to start properly (%s)\n", dhdErrorGetLastStr());
+            dhdSleep(2.0);
+            for (int j = 0; j <= dev; j++) drdClose(j);
+            return -1;
+        }
+    }
+    //while (drdIsMoving(deviceID1) || drdIsMoving(deviceID0)) drdWaitForTick(deviceID1);
+    //dhdSetForce(0.0, 0.0, 0.0, deviceID0);
+    //drdStop(false, deviceID0);
+    //drdStop(true, deviceID1);
+
+    
+
+    dhdEnableSimulator(true);
+    drdEnableFilter(true, deviceID1);
+    // haptic loop
+    int flag = 0;
+    while (true)
+    {
+        //drdMoveToPos(0.0, 0.0, 0.0, false, deviceID1);
+        //drdMoveToPos(0.0, 0.0, 0.0, false, deviceID0);
+        double fx;
+        double fy;
+        double fz;
+        double px;
+        double py;
+        double pz;
+        double i = 1.0;
+        //dhdSetForce(0.0, 0.0, 0.0, deviceID1);
+
+
+        //dhdGetPosition(&fx, &fy, &fz, deviceID0);
+
+        //std::cout << "Position 0: " << fx << ", " << fy << ", " << fz  << std::endl;
+        double time = drdGetTime();
+        int seq = 0;
+        //for (double a = 0.0; a <= 0.05; a += 0.001) 
+        //{
+        //    /*if (time - drdGetTime() >= 1) { break; }*/
+        //    seq++;
+        //    drdMoveToPos(0.0, a, 0.0);
+        //    dhdGetForce(&fx, &fy, &fz);
+        //    receivedDataX.push_back(fx);
+        //    receivedDataY.push_back(fy);
+        //    receivedDataZ.push_back(fz);
+        //}
+        //if (flag < 1) {
+        //    std::cout << "seq: " << seq << " time: " << drdGetTime()-time;
+        //    flag = 1;
+        //    recordDataToCSV("force.csv");
+        //}
+
+        for (double a = 0.0; a <= 0.05; a += 0.001)
+        {
+            drdMoveToPos(0.0, -a, a);
+
+            //record Force
+                dhdGetForce(&fx, &fy, &fz);
+                receivedDataX.push_back(fx);
+                receivedDataY.push_back(fy);
+                receivedDataZ.push_back(fz);
+            //record Position
+                dhdGetPosition(&px, &py, &pz);
+                receivedDataX.push_back(px);
+                receivedDataY.push_back(py);
+                receivedDataZ.push_back(pz);
+
+        }
+        for (double a = 0.0; a <= 0.05; a += 0.001)
+        {
+            drdMoveToPos(0.0, a, a);
+
+            dhdGetForce(&fx, &fy, &fz);
+            receivedDataX.push_back(fx);
+            receivedDataY.push_back(fy);
+            receivedDataZ.push_back(fz);
+            
+            dhdGetPosition(&px, &py, &pz);
+            receivedDataX.push_back(px);
+            receivedDataY.push_back(py);
+            receivedDataZ.push_back(pz);
+
+        }
+        for (double a = 0.0; a <= 0.05; a += 0.001)
+        {
+            drdMoveToPos(0.0, a, -a);
+
+            dhdGetForce(&fx, &fy, &fz);
+            receivedDataX.push_back(fx);
+            receivedDataY.push_back(fy);
+            receivedDataZ.push_back(fz);
+
+            dhdGetPosition(&px, &py, &pz);
+            receivedDataX.push_back(px);
+            receivedDataY.push_back(py);
+            receivedDataZ.push_back(pz);
+        }
+        for (double a = 0.0; a <= 0.05; a += 0.001)
+        {
+            drdMoveToPos(0.0, -a, -a);
+
+            dhdGetForce(&fx, &fy, &fz);
+            receivedDataX.push_back(fx);
+            receivedDataY.push_back(fy);
+            receivedDataZ.push_back(fz);
+
+            dhdGetPosition(&px, &py, &pz);
+            receivedDataX.push_back(px);
+            receivedDataY.push_back(py);
+            receivedDataZ.push_back(pz);
+        }
+        for (double a = 0.0; a <= 0.05; a += 0.001)
+        {
+            drdMoveToPos(0.0, -a, a);
+
+            dhdGetForce(&fx, &fy, &fz);
+            receivedDataX.push_back(fx);
+            receivedDataY.push_back(fy);
+            receivedDataZ.push_back(fz);
+
+            dhdGetPosition(&px, &py, &pz);
+            receivedDataX.push_back(px);
+            receivedDataY.push_back(py);
+            receivedDataZ.push_back(pz);
+        }
+        for (double a = 0.0; a <= 0.05; a += 0.001)
+        {
+            drdMoveToPos(0.0, a, a);
+            
+            dhdGetForce(&fx, &fy, &fz);
+            receivedDataX.push_back(fx);
+            receivedDataY.push_back(fy);
+            receivedDataZ.push_back(fz);
+
+            dhdGetPosition(&px, &py, &pz);
+            receivedDataX.push_back(px);
+            receivedDataY.push_back(py);
+            receivedDataZ.push_back(pz);
+        }
+        if (flag < 1) 
+        {
+        std::cout << "seq: " << seq << " time: " << drdGetTime()-time;
+        flag = 1;
+        recordDataToCSV("force.csv", receivedDataX, receivedDataY, receivedDataZ);
+        recordDataToCSV("position.csv", receivedDataPosX, receivedDataPosY, receivedDataPosZ);
+        }
+
+        
+
+//rectangle
+
+
+        //while (!(dhdGetButton(0, deviceID0)))// || dhdGetButton(0, deviceID1))) 
+        //{
+        //    //dhdGetPosition(&fx, &fy, &fz, deviceID1);
+        //    //std::cout << "Position 0: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    flag = 1;
+        //    drdMoveToPos(0.0, -0.05, 0.05);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 1: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, 0.05, 0.05);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 2: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, 0.05, -0.05);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 3: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, -0.05, -0.05);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 4: " << fx << ", " << fy << ", " << fz << std::endl;
+        //}
+
+//circle
+
+
+        //while (!(dhdGetButton(0, deviceID0)))// || dhdGetButton(0, deviceID1)))
+        //{
+        //    //dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    //std::cout << "Position 0: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, 0.0, 0.05);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 1: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, 0.03, 0.03);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 2: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, 0.05, 0.0);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 3: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, 0.03, -0.03);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 4: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, 0.0, -0.05);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 5: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, -0.03, -0.03);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 6: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, -0.05, 0.0);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 7: " << fx << ", " << fy << ", " << fz << std::endl;
+        //    drdMoveToPos(0.0, -0.03, 0.03);
+        //    dhdGetPosition(&fx, &fy, &fz, deviceID0);
+        //    std::cout << "Position 8: " << fx << ", " << fy << ", " << fz << std::endl;
+
+        //}
+
+                //dhdSetForce(1.0, 0.0, 0.0, deviceID1);
+                //dhdGetForce(&fx, &fy, &fz, deviceID1);
+                //dhdSetForce(0.0, 0.0, 1.0, deviceID1);
+                //std::cout << "force: " << fx << ", " << fy << ", " << fz << " i: " << i << std::endl;
+                //   // apply a null force to put the first device in gravity compensation
+
+        //}
+
+            // apply a null force to put the second device in gravity compensation
+            //drdTrackPos(-0.014228, 0.0136476, -0.0245081, deviceID0);
+
+            // exit the haptic loop on button press
+            if (dhdGetButton(0, deviceID0) || dhdGetButton(0, deviceID1))
+            {
+                break;
+            }
+        }
+        // close the connection to the first device
+        if (dhdClose(deviceID0) < 0)
+        {
+            std::cout << "error: " << dhdErrorGetLastStr() << std::endl;
+        }
+
+        // close the connection to the second device
+        /*if (dhdClose(deviceID1) < 0)
+        {
+            std::cout << "error: " << dhdErrorGetLastStr() << std::endl;
+        }*/
+
+        return 0;
+    }
